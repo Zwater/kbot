@@ -1,0 +1,5 @@
+{ 
+  "configDir" : "/home/zack/bots/kbot/serverConfig",  
+  "token"  : "YOUR TOKEN HERE",
+  "prefix" : "+"
+}
