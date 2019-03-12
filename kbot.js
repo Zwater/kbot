@@ -247,7 +247,7 @@ async function doBulkDelete(message, args){
 async function doConfig(message, args,  displayMessage) {
     if (!message.member.hasPermission("ADMINISTRATOR")){
         displayMessage.edit('ERROR: You do not appear to be a server administrator')
-        //return;
+        return;
     }
     switch(args[0]) {
         case 'show' :
