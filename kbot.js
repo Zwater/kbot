@@ -1,9 +1,10 @@
 // Load up the discord.js library
 const util = require('util')
-//const JSON = require('circular-json')
 const Discord = require("discord.js");
 const fs = require('fs');
 const schedule = require('node-schedule')
+// TODO: Make this configurable instead of hard-coded
+//
 const defaultConfig = {
     'leaveUnconfigured' : 'false',
     'configured' : 'false',
@@ -38,6 +39,8 @@ const config = require("./config.json");
 var serverConfig = {}
 var recentJoins = {}
 var autokick = schedule.scheduleJob('* * * * *', function() {
+    //Auto-kicker for members who've not posted something after joining
+    //
     var timestamp = new Date()
     var seconds = Math.round(timestamp / 1000)
     Object.keys(recentJoins).forEach(function(server) {
@@ -52,35 +55,36 @@ var autokick = schedule.scheduleJob('* * * * *', function() {
             }
         })
     })
-   
 })
 async function initConfig(client) {
     var configDir = config.configDir
     for ( let[snowflake, guild] of client.guilds) {
         // For each guild, load it's configuration file, else create an empty one
+        //
         recentJoins[guild.id] = {}
         if (fs.existsSync(`${configDir}/${guild.id}_config.json`)) {
             var fileConfig = require(`${configDir}/${guild.id}_config.json`)
             serverConfig[guild.id] = Object.assign({}, defaultConfig, fileConfig)
-            //serverConfig[guild.id] = fileConfig
         } else {
             // Config Doesn't exist
+            //
             console.log(`Creating skeleton config for ${guild.name}(${guild.id})`)
             fs.writeFileSync(`${configDir}/${guild.id}_config.json`, JSON.stringify(defaultConfig))
             serverConfig[guild.id] = defaultConfig
         }
     }
     console.log(`Finished initializing configs`)
-
 }
 function urlGenerator(msgObj) {
+    // Generates links to individual messages in a guild
+    //
     var url = `https://discordapp.com/channels/${msgObj.guild.id}/${msgObj.channel.id}/${msgObj.id}`
     return url
 }
-
-
-
 async function doBulkDelete(message, args){
+    // Bulk-deletes messages
+    // TODO: Function-ize much of this, lots of repeated code
+    //
     var statusMessage = await message.channel.send('Working...')
     if(!message.member.hasPermission("ADMINISTRATOR")) {
         statusMessage.edit(`ERROR: You do not appear to be an administrator`)
@@ -121,6 +125,8 @@ async function doBulkDelete(message, args){
                         latestID = message.id
                     }
                     statusMessage.edit(`Working. This may take a while...`)
+                    // Fetch up to 5K messages attempting to delete messages from user
+                    //
                     while (iterate <= 100) {
                         var fetch = await message.channel.fetchMessages()
                         for(let[snowflake, fetchedMessage] of fetch) {
@@ -243,7 +249,7 @@ function doConfig(message, args,  displayMessage) {
         case 'show' :
             displayMessage.edit('', new Discord.RichEmbed({
                 title: '**Current Server Configuration**',
-             fields: [
+                fields: [
                     {name: `**idiotChamber**`, value: `_Set either of these values to 'UNSET' to disable the idiot chamber_`},
                     {name: `idiotChamber.idiotChannel:`, value: `<#${serverConfig[message.guild.id].idiotChamber.idiotChannel.value}>`},
                     {name: `idiotChamber.idiotRole:`, value: `<@${serverConfig[message.guild.id].idiotChamber.idiotRole.value}>`},
@@ -298,7 +304,6 @@ function doConfig(message, args,  displayMessage) {
                 if(err) throw err;
                 console.log(`Write ${config.configDir}/${message.guild.id}_config.json`)
             })
-            //console.log('saved new config')
 
             break;
         case 'dumproleids' :
@@ -308,9 +313,6 @@ function doConfig(message, args,  displayMessage) {
             }
             displayMessage.edit(messageContents)
             break;
-            //serverConfig[message.guild.id][keys[0]][keys[1]] = args[2]
-            //displayMessage.edit(`Done. set ${args[1]} to ${args[2]}`)
-            //fs.writeFileSync(`${config.configDir}/${message.guild.id}_config.json`, JSON.stringify(serverConfig[message.guild.id]))
         default :
             displayMessage.edit('No valid config command. Available config commands are as follows', new Discord.RichEmbed({
                 fields: [
@@ -329,6 +331,8 @@ client.on("ready", () => {
 });
 client.on("guildCreate", guild => {
     console.log(`New guild joined: ${guild.name} (id: ${guild.id}). This guild has ${guild.memberCount} members!`);
+    // Generate an empty config for newly joined servers
+    //
     console.log(`Creating skeleton config for ${guild.name}(${guild.id})`)
     fs.writeFileSync(`${config.configDir}/${guild.id}_config.json`, JSON.stringify(defaultConfig))
     serverConfig[guild.id] = defaultConfig
@@ -344,14 +348,18 @@ client.on("guildMemberAdd", member => {
     if(!recentJoins[member.guild.id]){
         recentJoins[member.guild.id] = {}
     }
+    // Add member to recentJoins object so we can kick them later if the server has it enabled
+    //
     var timestamp = new Date()
     var seconds = Math.round(timestamp / 1000)
     recentJoins[member.guild.id][member.id] = seconds
-    console.log(recentJoins)
 
 })
 client.on("messageDelete", async message => {
     if(message.author.bot) return;
+    // If it's enabled, log deleted messages to the accountability log
+    // TODO: Create an embed constructor function
+    //
     if(serverConfig[message.guild.id].accountability.accountabilityChannel.value == 'UNSET') return;
     var channel = message.guild.channels.find(channel => channel.id === serverConfig[message.guild.id].accountability.accountabilityChannel.value)
     var color = 0x781706
@@ -375,6 +383,9 @@ client.on("messageDelete", async message => {
     }))
 })
 client.on("messageUpdate", async (oldMessage, newMessage) => {
+    // If it's enabled, write modified messages to the accountability log
+    // TODO: Ditto on the embed constructor
+    //
     if(oldMessage.author.bot) return;
     if(serverConfig[newMessage.guild.id].accountability.accountabilityChannel.value == 'UNSET') return;
     var channel = newMessage.guild.channels.find(channel => channel.id === serverConfig[newMessage.guild.id].accountability.accountabilityChannel.value)
@@ -418,10 +429,10 @@ client.on("message", async message => {
     if(command === "bulkdelete") {
         doBulkDelete(message, args)
     }
-    if(command === "debug") {
-        message.channel.send(args.toString())
-    }
     if(command === "help") {
+        // TODO: Create a help function instead of dumping the whole thing at once.
+        // Works for now, won't work once there are a lot of commands
+        //
         message.channel.send('', new Discord.RichEmbed({
             fields: [
                 {name: `**Config**`, value: `**To configure your bot**, an administrator must run the +config command.\n
