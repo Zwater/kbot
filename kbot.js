@@ -387,6 +387,7 @@ client.on("messageUpdate", async (oldMessage, newMessage) => {
     // TODO: Ditto on the embed constructor
     //
     if(oldMessage.author.bot) return;
+    if(oldMessage.cleanContent == newMessage.cleanContent) return;
     if(serverConfig[newMessage.guild.id].accountability.accountabilityChannel.value == 'UNSET') return;
     var channel = newMessage.guild.channels.find(channel => channel.id === serverConfig[newMessage.guild.id].accountability.accountabilityChannel.value)
     var color = 0xBA430D
