@@ -32,6 +32,10 @@ const defaultConfig = {
             'value' : 'UNSET',
             'type' : 'channel'
         },
+    },
+    'autoban': {
+        'users' : {
+        }
     }
 }
 const client = new Discord.Client();
@@ -48,8 +52,8 @@ var autokick = schedule.scheduleJob('* * * * *', function() {
         Object.keys(recentJoins[server]).forEach(async function(user) {
             //console.log(`we would kick ${user}`)
             if (seconds - recentJoins[server][user] > serverConfig[server].kickAfter.timeout.value) {
-                kickServer = await client.guilds.find(guild => guild.id === server)
-                kickMember = await kickServer.members.find(member => member.id === user)
+                kickServer = client.guilds.find(guild => guild.id === server)
+                kickMember = kickServer.members.find(member => member.id === user)
                 kickMember.kick('Inactivity Upon Joining')
                 delete recentJoins[server][user]
             }
@@ -240,10 +244,10 @@ async function doBulkDelete(message, args){
     }
 
 }
-function doConfig(message, args,  displayMessage) {
+async function doConfig(message, args,  displayMessage) {
     if (!message.member.hasPermission("ADMINISTRATOR")){
         displayMessage.edit('ERROR: You do not appear to be a server administrator')
-        return;
+        //return;
     }
     switch(args[0]) {
         case 'show' :
@@ -313,6 +317,47 @@ function doConfig(message, args,  displayMessage) {
             }
             displayMessage.edit(messageContents)
             break;
+        case 'autoban' :
+            switch(args[1]) {
+                case 'show' :
+                    var messageConstruct = ""
+                    Object.keys(serverConfig[message.guild.id].autoban.users).forEach(function(key) {
+                        messageConstruct = `\`${key}\` Reason: \`${serverConfig[message.guild.id].autoban.users[key]}\`\n`
+                    })
+                    if(messageConstruct.length <= 1) {
+                        messageConstruct = `There are no people on your banlist`
+                    }
+                    displayMessage.edit(messageConstruct)
+                    break;
+                case 'add' :
+                    var targetID = args[2]
+                    if (targetID.length == 18){
+                        args.shift()
+                        args.shift()
+                        args.shift()
+                        console.log(args)
+                        serverConfig[message.guild.id].autoban.users[targetID] = args.join(' ')
+                        displayMessage.edit('Done.')
+                    } else {
+                        displayMessage.edit('ERROR: You may not have specified a valid discord UserID')
+                    }
+                    break;
+                case 'remove' :
+                    var targetID = args[2]
+                    if (serverConfig[message.guild.id].autoban.users[targetID]){
+                        delete serverConfig[message.guild.id].autoban.users[targetID]
+                        displayMessage.edit('Done.')
+                    } else {
+                        displayMessage.edit('ERROR: User ID does not appear to exist in autoban list')
+                    }
+                    break;
+            }
+            var writeConfig = JSON.stringify(serverConfig[message.guild.id])
+            fs.writeFile(`${config.configDir}/${message.guild.id}_config.json`, writeConfig, (err) => {
+                if(err) throw err;
+                console.log(`Write ${config.configDir}/${message.guild.id}_config.json`)
+            })
+            break;
         default :
             displayMessage.edit('No valid config command. Available config commands are as follows', new Discord.RichEmbed({
                 fields: [
@@ -342,6 +387,14 @@ client.on("guildDelete", guild => {
     console.log(`I have been removed from: ${guild.name} (id: ${guild.id})`);
 });
 client.on("guildMemberAdd", member => {
+    // Ban the user if they are on the server's auto-ban list
+    //
+    if (serverConfig[member.guild.id].autoban.users[member.id]) {
+        member.ban(serverConfig[member.guild.id].autoban.users[member.id])
+        // We banned them so we don't have to do any of the other stuff
+        //
+        return;
+    }
     if (serverConfig[member.guild.id].idiotChamber.idiotRole.value != "UNSET" && serverConfig[member.guild.id].idiotChamber.idiotChannel.value != "UNSET") {
         member.addRole(serverConfig[member.guild.id].idiotChamber.idiotRole.value)
     }
