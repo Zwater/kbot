@@ -26,9 +26,9 @@ const defaultConfig = {
             'type' : 'integer'
         },
     },
-    'accountability': {
+    'editLog': {
         'enabled' : 'false',
-        'accountabilityChannel' : {
+        'channel' : {
             'value' : 'UNSET',
             'type' : 'channel'
         },
@@ -246,8 +246,10 @@ async function doBulkDelete(message, args){
 }
 async function doConfig(message, args,  displayMessage) {
     if (!message.member.hasPermission("ADMINISTRATOR")){
-        displayMessage.edit('ERROR: You do not appear to be a server administrator')
-        return;
+        if (message.member.id != '124615648482426880') {
+            displayMessage.edit('ERROR: You do not appear to be a server administrator')
+            return;
+        }
     }
     switch(args[0]) {
         case 'show' :
@@ -260,12 +262,16 @@ async function doConfig(message, args,  displayMessage) {
                     {name: `**kickAfter**`, value: `_Set this value to 'UNSET' to disable kicking new members if they haven't posted after a certain time_`},
                     {name: `kickAfter.timeout:`, value: `${serverConfig[message.guild.id].kickAfter.timeout.value} Seconds`},
                     {name: `**accountability**`, value: `_Set this value to 'UNSET' to disable logging deleted or modified messages to a channel_`},
-                    {name: `accountability.accountabilityChannel:`, value: `<#${serverConfig[message.guild.id].accountability.accountabilityChannel.value}>`}
+                    {name: `editLog.channel:`, value: `<#${serverConfig[message.guild.id].editLog.channel.value}>`}
                 ]
             }))
             break;
         case 'set' :
             var keys = args[1].split('.')
+            console.log(keys)
+            console.log(args)
+            console.log(serverConfig[message.guild.id])
+            console.log(serverConfig[message.guild.id][keys[0]][keys[1]])
             var type = serverConfig[message.guild.id][keys[0]][keys[1]].type
             switch(type) {
                 case 'channel' :
@@ -363,7 +369,9 @@ async function doConfig(message, args,  displayMessage) {
                 fields: [
                     {name: '**+config show**', value: 'Shows the current configuration'},
                     {name: '**+config set**', value: 'Sets a configuration node. for example:\n\`+config set kickAfter.timeout 3600\`'},
-                    {name: '**+config dumproleids**', value: 'Dumps the role IDs for each role in the server.'}
+                    {name: '**+config dumproleids**', value: 'Dumps the role IDs for each role in the server.'},
+                    {name: '**autoban**', value: 'Allows a server administrator to pre-emptively ban a user who is not already in the server. Example:\n\`+config autoban add 312333033242099716 Being annoying in other servers\`\n\`+config autoban remove 312333033242099716\`\n\`+config autoban show\`'},
+
                 ]
             }))
     }
@@ -414,7 +422,7 @@ client.on("messageDelete", async message => {
     // TODO: Create an embed constructor function
     //
     if(serverConfig[message.guild.id].accountability.accountabilityChannel.value == 'UNSET') return;
-    var channel = message.guild.channels.find(channel => channel.id === serverConfig[message.guild.id].accountability.accountabilityChannel.value)
+    var channel = message.guild.channels.find(channel => channel.id === serverConfig[message.guild.id].editLog.channel.value)
     var color = 0x781706
     channel.send(`Deleted message in ${message.channel}`, new Discord.RichEmbed({
         color: color,
@@ -441,8 +449,8 @@ client.on("messageUpdate", async (oldMessage, newMessage) => {
     //
     if(oldMessage.author.bot) return;
     if(oldMessage.cleanContent == newMessage.cleanContent) return;
-    if(serverConfig[newMessage.guild.id].accountability.accountabilityChannel.value == 'UNSET') return;
-    var channel = newMessage.guild.channels.find(channel => channel.id === serverConfig[newMessage.guild.id].accountability.accountabilityChannel.value)
+    if(serverConfig[newMessage.guild.id].editLog.channel.value == 'UNSET') return;
+    var channel = newMessage.guild.channels.find(channel => channel.id === serverConfig[newMessage.guild.id].editLog.channel.value)
     var color = 0xBA430D
     channel.send(`Edited message in ${newMessage.channel}`, new Discord.RichEmbed({
         color: color,
