@@ -42,6 +42,7 @@ const client = new Discord.Client();
 const config = require("./config.json");
 var serverConfig = {}
 var recentJoins = {}
+const modules = {}
 var autokick = schedule.scheduleJob('* * * * *', function() {
     //Auto-kicker for members who've not posted something after joining
     //
@@ -60,6 +61,34 @@ var autokick = schedule.scheduleJob('* * * * *', function() {
         })
     })
 })
+async function loadModules () {
+    fs.readdir('./modules/', (err, files) => {
+        if (err) {
+            return 'Failed to load Modules'
+        } else {
+            files.forEach(file => {
+                const name = file.split('.')[0]
+                modules[name] = require(`./modules/${file}`)
+                console.log(`Loading Module: ${name}`)
+            })
+        }
+    })
+}
+function loadEvents () {
+    fs.readdir('./events/', (err, files) => {
+        if (err) {
+            return 'Failed to load Events'
+        } else {
+            files.forEach(file => {
+                const name = file.split('.')[0]
+                const event = require(`./events/${file}`)
+                client.on(name, event.bind(null, config, serverConfig, modules, client))
+                console.log(`Loading Event: ${name}`)
+            })
+        }
+    })
+}
+
 async function initConfig(client) {
     var configDir = config.configDir
     for ( let[snowflake, guild] of client.guilds) {
@@ -472,7 +501,7 @@ client.on("messageUpdate", async (oldMessage, newMessage) => {
         }
     }))
 })
-client.on("message", async message => {
+client.on("disconnect", async message => {
     if(message.author.bot) return;
     if(recentJoins[message.guild.id][message.author.id] && message.type == 'DEFAULT') {
         delete recentJoins[message.guild.id][message.author.id]
@@ -514,5 +543,7 @@ client.on("message", async message => {
         }))
     }
 });
+loadModules()
+loadEvents()
 
 client.login(config.token);
